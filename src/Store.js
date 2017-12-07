@@ -1,34 +1,35 @@
-const lodashGet = require('lodash.get');
-const lodashSet = require('lodash.Set');
+import safeGet from './safeGet';
+import safeSet from './safeSet';
 var noop = function () {},
     isSupported = _isStorageSupported(localStorage),
     defaultOptions = {
         Storage: "localStorage",
-        exp: 315360000000, // 默认超时10000年
+        exp: 3153600000, // 默认超时100年
         serialize(data) {
             return JSON.stringify(data);
         },
         deserialize(data) {
             return data && JSON.parse(data);
         },
+        parseToArray: true,
         polyfill: { // 不支持localStorage时,可以通过实现以下函数来进行polyfill
-            getItem: noop,
             setItem: noop,
             removeItem: noop,
             getAllStorage: noop
         }
     }
-
+/**
+ * Store构造函数
+ * @param {Object} opts 
+ */
 var Store = function (opts) {
     var that = this;
     if (!(this instanceof Store)) {
         throw new TypeError("Failed to construct 'Store': Please use the 'new' operator, this object construc" +
-                "tor cannot be called as a function.");
+            "tor cannot be called as a function.");
     }
     this.opts = _extend(defaultOptions, opts);
-
     this.setItem = _setFunction("setItem");
-    this.getItem = _setFunction("getItem");
     this.removeItem = _setFunction("removeItem");
     this.getAllStorage = _setFunction("getAllStorage");
 
@@ -54,7 +55,7 @@ function isFunction() {
 }
 
 function _extend(obj, props) {
-    for (var key in props) 
+    for (var key in props)
         obj[key] = props[key];
     return obj;
 }
@@ -73,54 +74,74 @@ function _isStorageSupported(storage) {
     }
     return supported;
 }
-
-function isLegalStruct(data) {
-    if ("__start__" in storageData && "__end__" in storageData && "__data__" in storageData) {
+/**
+ * 判断从storage中的数据是否符合我们定义的格式
+ * @param {Object} allStorage
+ */
+function isLegalStruct(allStorage) {
+    if (typeof allStorage === 'object' && "__start__" in allStorage && "__end__" in allStorage && "__data__" in allStorage) {
         return true;
     } else {
         return false;
     }
 }
 
+function initLegalStruct() {
+    return {
+        __start__: undefined,
+        __data__: undefined,
+        __end__: undefined
+    };
+}
+
 Store.prototype = {
     constructor: Store,
     get(key) {
-        var storageData = this.getAllStorage(),
+        var allStorage = this.getAllStorage(),
             firstKey = key.split(".")[0],
-            parsedData = this
-                .opts
-                .deserialize(storageData[firstKey]);
+            parsedData = this.opts.deserialize(allStorage[firstKey]);
         if (isLegalStruct(parsedData)) {
-            if (+ new Date() >= parsedData.__end__) { // 已过期
+            if (+new Date() >= parsedData.__end__) {
+                // 已过期
                 this.remove(firstKey);
             } else {
-                return lodashGet(parsedData.__data__, key);
+                return safeGet(parsedData.__data__, key);
             }
         }
     },
     set(key, val, opts) {
         var opts = _extend(this.opts, opts),
-            storageData = this.getAllStorage(),
+            allStorage = this.getAllStorage(),
             firstKey = key.split(".")[0],
+            parsedData = this.opts.deserialize(allStorage[firstKey]),
             nowTimeStamp = +new Date(),
-            expiresTime = nowTimeStamp + parseFloat(opts.exp);
-        this.setItem(firstKey, opts.serialize({
+            expiresTime = nowTimeStamp + opts.exp * 1000,
+            resultData;
+        if (!isLegalStruct(parsedData)) {
+            parsedData = initLegalStruct();
+        }
+        resultData = safeSet(parsedData.__data__, key, val, this.opts.parseToArray);
+        this.setItem.call(window[this.opts.Storage], firstKey, opts.serialize({
             __start__: nowTimeStamp,
             __end__: expiresTime,
-            __data__: lodashSet(this.opts.deserialize, key, val)
+            __data__: resultData
         }))
     },
     remove(key) {
-        this.removeItem(key);
+        this.removeItem.call(window[this.opts.Storage], key);
     },
     isSupported,
     clearAllExpires() {
-        var storageData = this.getAllStorage(),
-            nowTimeStamp = +new Date();
-        for (var key in storageData) {
-            if (isLegalStruct(storageData[key])) {
-                if (nowTimeStamp >= storageData[key].__end__) {
-                    this.removeItem(key);
+        var allStorage = this.getAllStorage(),
+            nowTimeStamp = +new Date(),
+            parsedData;
+        for (var key in allStorage) {
+            if (allStorage.hasOwnProperty(key)) {
+                parsedData = this.opts.deserialize(allStorage[key]);
+                if (isLegalStruct(parsedData)) {
+                    if (nowTimeStamp >= parsedData.__end__) {
+                        this.removeItem.call(window[this.opts.Storage], key);
+                    }
                 }
             }
         }

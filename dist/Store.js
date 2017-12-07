@@ -4,13 +4,275 @@
 	(global.Store = factory());
 }(this, (function () { 'use strict';
 
-var lodashGet = require('lodash.get');
-var lodashSet = require('lodash.Set');
+/**
+ * 不知道对象结构时取值时,一般会采用 obj&&obj[0]&&obj.name的方法,等价于下面的方法
+ *  f(obj,'[0].name') === f(obj,['0','name'])
+ * @param {取值的对象} obj 
+ * @param {用于取值的字符串或者数组} path 
+    var testData = { a: [{ c: { b: [233] } }] };
+    safeGet(testData,'a[0].c.b[0]') => 233
+    safeGet(testData,['a','0','c','b','0']) => 233
+ */
+function safeGet(obj, path) {
+  if (Array.isArray(path)) {
+    return path.reduce(function (ob, k) {
+      return ob && ob[k] ? ob[k] : undefined;
+    }, obj);
+  } else if (typeof path == "string") {
+    var arrKeys = path.split("."),
+        keys = [],
+        m;
+    arrKeys.forEach(function (k) {
+      if (m = k.match(/([^\[\]]+)|(\[\d+\])/g)) {
+        // arr[3][2] =>  ['arr',[3],[2]]
+        m = m.map(function (v) {
+          return v.replace(/\[(\d+)\]/, "$1");
+        });
+        // ['arr',[3],[2]] => ['arr','3','2']
+        [].push.apply(keys, m);
+      }
+    });
+    return safeGet(obj, keys);
+  }
+}
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
+  return typeof obj;
+} : function (obj) {
+  return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+};
+
+
+
+
+
+var asyncGenerator = function () {
+  function AwaitValue(value) {
+    this.value = value;
+  }
+
+  function AsyncGenerator(gen) {
+    var front, back;
+
+    function send(key, arg) {
+      return new Promise(function (resolve, reject) {
+        var request = {
+          key: key,
+          arg: arg,
+          resolve: resolve,
+          reject: reject,
+          next: null
+        };
+
+        if (back) {
+          back = back.next = request;
+        } else {
+          front = back = request;
+          resume(key, arg);
+        }
+      });
+    }
+
+    function resume(key, arg) {
+      try {
+        var result = gen[key](arg);
+        var value = result.value;
+
+        if (value instanceof AwaitValue) {
+          Promise.resolve(value.value).then(function (arg) {
+            resume("next", arg);
+          }, function (arg) {
+            resume("throw", arg);
+          });
+        } else {
+          settle(result.done ? "return" : "normal", result.value);
+        }
+      } catch (err) {
+        settle("throw", err);
+      }
+    }
+
+    function settle(type, value) {
+      switch (type) {
+        case "return":
+          front.resolve({
+            value: value,
+            done: true
+          });
+          break;
+
+        case "throw":
+          front.reject(value);
+          break;
+
+        default:
+          front.resolve({
+            value: value,
+            done: false
+          });
+          break;
+      }
+
+      front = front.next;
+
+      if (front) {
+        resume(front.key, front.arg);
+      } else {
+        back = null;
+      }
+    }
+
+    this._invoke = send;
+
+    if (typeof gen.return !== "function") {
+      this.return = undefined;
+    }
+  }
+
+  if (typeof Symbol === "function" && Symbol.asyncIterator) {
+    AsyncGenerator.prototype[Symbol.asyncIterator] = function () {
+      return this;
+    };
+  }
+
+  AsyncGenerator.prototype.next = function (arg) {
+    return this._invoke("next", arg);
+  };
+
+  AsyncGenerator.prototype.throw = function (arg) {
+    return this._invoke("throw", arg);
+  };
+
+  AsyncGenerator.prototype.return = function (arg) {
+    return this._invoke("return", arg);
+  };
+
+  return {
+    wrap: function (fn) {
+      return function () {
+        return new AsyncGenerator(fn.apply(this, arguments));
+      };
+    },
+    await: function (value) {
+      return new AwaitValue(value);
+    }
+  };
+}();
+
+/**
+ * @param {处理的对象} obj 
+ * @param {路径:数组或者字符串} path 
+ * @param {设置的值} val 
+ * @param {当键值为正数字时,生成数组覆盖} toArray 
+ * var obj1={a:1};
+ * safeSet(obj1,'b.c[1]',2)  => {a:1,b:{c:{"1":2}}}
+ * safeSet(obj1,'b.c[1]',2,true)  => {a:1,b:{c:[,2]}}
+ * 
+ * var obj2={};
+ * safeSet(obj2,'1','wtf')  => {"1":'wtf'}
+ * safeSet(obj2,'1','wtf',true)  => {1:'wtf'} // 只有当取的key值的父级(obj2)不为对象时,并且newArrayIfNeed==true 才会新建数组
+ * 
+ * var obj3=2;
+ * safeSet(obj2,'1','wtf')  => {"1":'wtf'}
+ * safeSet(obj2,'1','wtf',true)  => ["1":'wtf']
+ * 
+ * 思路:
+ * obj表示对象  k:表示key  result:需要赋值的值
+ * * 判断能否取值 obj    (代码A)
+ *      * 能取值
+ *              * obj[k]是否存在 
+ *                    * 存在       
+ *                          *  obj[k]不是引用对象   (代码C)
+ *                                * 是否是最后一个key
+ *                                      * 是,obj[k]=result
+ *                                      * 不是
+ *                                          *根据下一个key值和newArrayIfNeed  obj[k]={}或[] 重复A
+ *                          *  obj[k]是引用对象   下一个key?ob=obj[k]并重复A: obj[k]=result                 
+ *                    * 不存在
+ *                          *  是否是最后一个key
+ *                                      * 是,obj[k]=result
+ *                                      * 不是
+ *                                          *根据下一个key值和newArrayIfNeed  obj[k]={}或[] 重复A=result 
+ *      * 不能取值   (代码B)
+ *             * 根据key值和newArrayIfNeed  obj[k]={}或[]  下一个key?ob=obj[k]并重复A: obj[k]=result 
+ * 
+ */
+function _newObjectOrArray(key, newArrayIfNeed) {
+  if (newArrayIfNeed && parseInt(key) == key && /^(([1-9]\d*)|0)$/.test(key)) {
+    return new Array(parseInt(key)); //  因为new Array("1") => ["1"] ,所以需要parseInt处理一下   
+  } else {
+    return {};
+  }
+}
+
+function safeSet(data, path, result, newArrayIfNeed) {
+  if (Array.isArray(path)) {
+    var ob = data,
+        ArrayObj = [],
+        key,
+        val;
+    for (var i = 0, len = path.length; i <= len - 1; i++) {
+      key = path[i];
+      if ((typeof ob === "undefined" ? "undefined" : _typeof(ob)) == "object" && ob != null) {
+        ArrayObj.push(ob);
+        val = ob[key];
+        if (val && (typeof val === "undefined" ? "undefined" : _typeof(val)) == "object") {
+          ob[key] = val;
+        } else {
+          if (i == len - 1) {
+            ob[key] = result;
+          } else {
+            ob[key] = _newObjectOrArray(path[i + 1], newArrayIfNeed);
+          }
+        }
+      } else {
+        // (代码B)
+        ob = _newObjectOrArray(key, newArrayIfNeed);
+        ArrayObj.push(ob);
+        if (i == len - 1) {
+          ob[key] = result;
+        } else {
+          ob[key] = _newObjectOrArray(path[i + 1], newArrayIfNeed);
+        }
+      }
+      ob = ob[key];
+    }
+    return ArrayObj[0];
+  } else if (typeof path == "string") {
+    // 解析path为数组    list[2].user.[3]  =>  ['list','2','user',3]
+    var splitArr = path.split("."),
+        pathKeyArr = [],
+        k;
+    splitArr.forEach(function (key) {
+      if (k = key.match(/([^\[\]]+)|(\[\d+\])/g)) {
+        // list[2]  => ['list','[2]']
+        k = k.map(function (v) {
+          return v.replace(/\[(\d+)\]/, "$1");
+        }); // [2] => 2  
+        [].push.apply(pathKeyArr, k);
+      }
+    });
+    return safeSet(data, pathKeyArr, result, newArrayIfNeed);
+  }
+}
+
+//var obj1 = { a: 1 };
+// safeSet(obj1,'b.c[1]',2)
+// safeSet(obj1,'b.c[1]',2,true) // => {a:1,b:{c:[,2]}}
+
+//var obj2 = {};
+// safeSet(obj2,'1','wtf') // => {"1":'wtf'}
+// safeSet(obj2,'1','wtf',true) // => {1:'wtf'} // 只有当取的key值的父级(obj2)不为对象时,并且newArrayIfNeed==true 才会新建数组
+
+//var obj3 = 3;
+//safeSet(obj3,'[1].b.c','wtf')  // =>  {1:b:{c:'wtf'}}
+//safeSet(obj3,'[1].b.c','wtf',true)  // =>  [,{b:{c:'wth'}}]
+
 var noop = function noop() {};
 var isSupported = _isStorageSupported(localStorage);
 var defaultOptions = {
     Storage: "localStorage",
-    exp: 315360000000, // 默认超时10000年
+    exp: 3153600000, // 默认超时100年
     serialize: function serialize(data) {
         return JSON.stringify(data);
     },
@@ -18,23 +280,23 @@ var defaultOptions = {
         return data && JSON.parse(data);
     },
 
+    parseToArray: true,
     polyfill: { // 不支持localStorage时,可以通过实现以下函数来进行polyfill
-        getItem: noop,
         setItem: noop,
         removeItem: noop,
         getAllStorage: noop
     }
-};
-
-var Store = function Store(opts) {
+    /**
+     * Store构造函数
+     * @param {Object} opts 
+     */
+};var Store = function Store(opts) {
     var that = this;
     if (!(this instanceof Store)) {
         throw new TypeError("Failed to construct 'Store': Please use the 'new' operator, this object construc" + "tor cannot be called as a function.");
     }
     this.opts = _extend(defaultOptions, opts);
-
     this.setItem = _setFunction("setItem");
-    this.getItem = _setFunction("getItem");
     this.removeItem = _setFunction("removeItem");
     this.getAllStorage = _setFunction("getAllStorage");
 
@@ -81,54 +343,75 @@ function _isStorageSupported(storage) {
     }
     return supported;
 }
-
-function isLegalStruct(data) {
-    if ("__start__" in storageData && "__end__" in storageData && "__data__" in storageData) {
+/**
+ * 判断从storage中的数据是否符合我们定义的格式
+ * @param {Object} allStorage
+ */
+function isLegalStruct(allStorage) {
+    if ((typeof allStorage === 'undefined' ? 'undefined' : _typeof(allStorage)) === 'object' && "__start__" in allStorage && "__end__" in allStorage && "__data__" in allStorage) {
         return true;
     } else {
         return false;
     }
 }
 
+function initLegalStruct() {
+    return {
+        __start__: undefined,
+        __data__: undefined,
+        __end__: undefined
+    };
+}
+
 Store.prototype = {
     constructor: Store,
-    get: function get(key) {
-        var storageData = this.getAllStorage(),
+    get: function get$$1(key) {
+        var allStorage = this.getAllStorage(),
             firstKey = key.split(".")[0],
-            parsedData = this.opts.deserialize(storageData[firstKey]);
+            parsedData = this.opts.deserialize(allStorage[firstKey]);
         if (isLegalStruct(parsedData)) {
             if (+new Date() >= parsedData.__end__) {
                 // 已过期
                 this.remove(firstKey);
             } else {
-                return lodashGet(parsedData.__data__, key);
+                return safeGet(parsedData.__data__, key);
             }
         }
     },
-    set: function set(key, val, opts) {
+    set: function set$$1(key, val, opts) {
         var opts = _extend(this.opts, opts),
-            storageData = this.getAllStorage(),
+            allStorage = this.getAllStorage(),
             firstKey = key.split(".")[0],
+            parsedData = this.opts.deserialize(allStorage[firstKey]),
             nowTimeStamp = +new Date(),
-            expiresTime = nowTimeStamp + parseFloat(opts.exp);
-        this.setItem(firstKey, opts.serialize({
+            expiresTime = nowTimeStamp + opts.exp * 1000,
+            resultData;
+        if (!isLegalStruct(parsedData)) {
+            parsedData = initLegalStruct();
+        }
+        resultData = safeSet(parsedData.__data__, key, val, this.opts.parseToArray);
+        this.setItem.call(window[this.opts.Storage], firstKey, opts.serialize({
             __start__: nowTimeStamp,
             __end__: expiresTime,
-            __data__: lodashSet(this.opts.deserialize, key, val)
+            __data__: resultData
         }));
     },
     remove: function remove(key) {
-        this.removeItem(key);
+        this.removeItem.call(window[this.opts.Storage], key);
     },
 
     isSupported: isSupported,
     clearAllExpires: function clearAllExpires() {
-        var storageData = this.getAllStorage(),
-            nowTimeStamp = +new Date();
-        for (var key in storageData) {
-            if (isLegalStruct(storageData[key])) {
-                if (nowTimeStamp >= storageData[key].__end__) {
-                    this.removeItem(key);
+        var allStorage = this.getAllStorage(),
+            nowTimeStamp = +new Date(),
+            parsedData;
+        for (var key in allStorage) {
+            if (allStorage.hasOwnProperty(key)) {
+                parsedData = this.opts.deserialize(allStorage[key]);
+                if (isLegalStruct(parsedData)) {
+                    if (nowTimeStamp >= parsedData.__end__) {
+                        this.removeItem.call(window[this.opts.Storage], key);
+                    }
                 }
             }
         }

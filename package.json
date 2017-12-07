@@ -1,16 +1,28 @@
 {
-  "name": "utils",
-  "version": "1.0.0",
-  "description": "",
+  "name": "LStore",
+  "version": "0.0.1",
+  "description": "A js libray for web storage, default support for localStorage and sessionStorage.",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:julyL/web-storage.git"
+  },
   "scripts": {
     "test": "mocha  --compilers js:babel-register test/*.test.js",
     "build": "rollup -c",
+    "publish": "rollup -c&&cross-env NODE_ENV=production rollup -c",
     "dev": "rollup -c --watch"
   },
-  "keywords": [],
+  "keywords": [
+    "web storage",
+    "localStorage"
+  ],
   "author": "julyL",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/julyL/web-storage/issues"
+  },
+  "homepage": "https://github.com/julyL/web-storage#readme",
   "devDependencies": {
     "assert": "^1.4.1",
     "babel-core": "^6.26.0",
@@ -18,14 +30,13 @@
     "babel-preset-es2015-rollup": "^3.0.0",
     "babel-register": "^6.26.0",
     "chai": "^4.1.2",
+    "cross-env": "^5.1.1",
     "mocha": "^3.5.0",
     "rollup": "^0.49.2",
     "rollup-plugin-babel": "^2.7.1",
-    "rollup-plugin-node-resolve": "^2.0.0",
-    "rollup-plugin-uglify": "1.0.1",
+    "rollup-plugin-commonjs": "^8.2.6",
+    "rollup-plugin-node-resolve": "^2.1.1",
+    "rollup-plugin-uglify": "^2.0.1",
     "rollup-watch": "^4.3.1"
-  },
-  "dependencies": {
-    "lodash": "^4.17.4"
   }
 }
