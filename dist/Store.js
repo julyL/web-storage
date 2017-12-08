@@ -256,23 +256,11 @@ function safeSet(data, path, result, newArrayIfNeed) {
   }
 }
 
-//var obj1 = { a: 1 };
-// safeSet(obj1,'b.c[1]',2)
-// safeSet(obj1,'b.c[1]',2,true) // => {a:1,b:{c:[,2]}}
-
-//var obj2 = {};
-// safeSet(obj2,'1','wtf') // => {"1":'wtf'}
-// safeSet(obj2,'1','wtf',true) // => {1:'wtf'} // 只有当取的key值的父级(obj2)不为对象时,并且newArrayIfNeed==true 才会新建数组
-
-//var obj3 = 3;
-//safeSet(obj3,'[1].b.c','wtf')  // =>  {1:b:{c:'wtf'}}
-//safeSet(obj3,'[1].b.c','wtf',true)  // =>  [,{b:{c:'wth'}}]
-
 var noop = function noop() {};
-var isSupported = _isStorageSupported(localStorage);
 var defaultOptions = {
+    debug: false,
     Storage: "localStorage",
-    exp: 3153600000, // 默认超时100年
+    exp: 31536000000, // 默认超时100年
     serialize: function serialize(data) {
         return JSON.stringify(data);
     },
@@ -329,6 +317,10 @@ function _extend(obj, props) {
     }return obj;
 }
 
+/**
+ * 判断当前环境是否支持Storage(只支持判断localStorage和sessionStorage)
+ * @param {Object} storage 
+ */
 function _isStorageSupported(storage) {
     var supported = false;
     if (storage && storage.setItem) {
@@ -355,6 +347,9 @@ function isLegalStruct(allStorage) {
     }
 }
 
+/**
+ * 新建一个用于存储Storage的对象
+ */
 function initLegalStruct() {
     return {
         __start__: undefined,
@@ -363,58 +358,102 @@ function initLegalStruct() {
     };
 }
 
-Store.prototype = {
-    constructor: Store,
-    get: function get$$1(key) {
-        var allStorage = this.getAllStorage(),
-            firstKey = key.split(".")[0],
-            parsedData = this.opts.deserialize(allStorage[firstKey]);
-        if (isLegalStruct(parsedData)) {
-            if (+new Date() >= parsedData.__end__) {
-                // 已过期
-                this.remove(firstKey);
-            } else {
-                return safeGet(parsedData.__data__, key);
-            }
-        }
-    },
-    set: function set$$1(key, val, opts) {
-        var opts = _extend(this.opts, opts),
-            allStorage = this.getAllStorage(),
-            firstKey = key.split(".")[0],
-            parsedData = this.opts.deserialize(allStorage[firstKey]),
-            nowTimeStamp = +new Date(),
-            expiresTime = nowTimeStamp + opts.exp * 1000,
-            resultData;
-        if (!isLegalStruct(parsedData)) {
-            parsedData = initLegalStruct();
-        }
-        resultData = safeSet(parsedData.__data__, key, val, this.opts.parseToArray);
-        this.setItem.call(window[this.opts.Storage], firstKey, opts.serialize({
-            __start__: nowTimeStamp,
-            __end__: expiresTime,
-            __data__: resultData
-        }));
-    },
-    remove: function remove(key) {
-        this.removeItem.call(window[this.opts.Storage], key);
-    },
-
-    isSupported: isSupported,
-    clearAllExpires: function clearAllExpires() {
-        var allStorage = this.getAllStorage(),
-            nowTimeStamp = +new Date(),
-            parsedData;
-        for (var key in allStorage) {
-            if (allStorage.hasOwnProperty(key)) {
-                parsedData = this.opts.deserialize(allStorage[key]);
-                if (isLegalStruct(parsedData)) {
-                    if (nowTimeStamp >= parsedData.__end__) {
-                        this.removeItem.call(window[this.opts.Storage], key);
-                    }
+function wrapper(fn, action) {
+    debugger;
+    console.log(this);
+    var args = [].slice.call(arguments, 2),
+        result,
+        storage,
+        key;
+    result = fn.apply(this, args);
+    if (this.opts.debug) {
+        storage = _extend({}, this.getAllStorage());
+        for (var i in storage) {
+            if (storage.hasOwnProperty(i)) {
+                key = this.opts.deserialize(storage[i]);
+                if (isLegalStruct(key)) {
+                    storage[i] = {
+                        __start: new Date(key.__start__).toUTCString(),
+                        __end__: new Date(key.__end__).toUTCString(),
+                        __data__: key.__data__
+                    };
+                } else {
+                    delete storage[i];
                 }
             }
         }
+        console.log(action + "(" + (args[0] ? '"' + args[0] + '"' : "") + (args[1] ? ", " + this.opts.serialize(args[1]) : "") + (args[2] ? ", " + JSON.stringify(args[2]) : "") + ")", "\n   =>  ", storage);
+    }
+    return result;
+}
+
+function _set(key, val, opts) {
+    var opts = _extend(this.opts, opts),
+        allStorage = this.getAllStorage(),
+        firstKey = key.split(".")[0],
+        parsedData = this.opts.deserialize(allStorage[firstKey]),
+        nowTimeStamp = +new Date(),
+        expiresTime = nowTimeStamp + opts.exp * 100;
+    if (!isLegalStruct(parsedData)) {
+        parsedData = initLegalStruct();
+    }
+    this.setItem.call(window[this.opts.Storage], firstKey, opts.serialize({
+        __start__: nowTimeStamp,
+        __end__: expiresTime,
+        __data__: safeSet(parsedData.__data__, key, val, this.opts.parseToArray)
+    }));
+}
+
+function _get(key) {
+    var allStorage = this.getAllStorage(),
+        firstKey = key.split(".")[0],
+        parsedData = this.opts.deserialize(allStorage[firstKey]);
+    if (isLegalStruct(parsedData)) {
+        if (+new Date() >= parsedData.__end__) {
+            // 取值时如果已过期,则会删除
+            this.remove(firstKey);
+        } else {
+            return safeGet(parsedData.__data__, key);
+        }
+    }
+}
+
+function _remove(key) {
+    this.removeItem.call(window[this.opts.Storage], key);
+}
+
+function _clearAllExpires() {
+    var allStorage = this.getAllStorage(),
+        nowTimeStamp = +new Date(),
+        parsedData;
+    for (var key in allStorage) {
+        if (allStorage.hasOwnProperty(key)) {
+            parsedData = this.opts.deserialize(allStorage[key]);
+            if (isLegalStruct(parsedData)) {
+                if (nowTimeStamp >= parsedData.__end__) {
+                    this.removeItem.call(window[this.opts.Storage], key);
+                }
+            }
+        }
+    }
+}
+
+Store.prototype = {
+    constructor: Store,
+    get: function get$$1() {
+        return wrapper.call.apply(wrapper, [this, _get, 'get'].concat(Array.prototype.slice.call(arguments)));
+    },
+    set: function set$$1() {
+        return wrapper.call.apply(wrapper, [this, _set, "set"].concat(Array.prototype.slice.call(arguments)));
+    },
+    remove: function remove() {
+        return wrapper.call.apply(wrapper, [this, _remove, "remove"].concat(Array.prototype.slice.call(arguments)));
+    },
+    clearAllExpires: function clearAllExpires() {
+        return wrapper.call.apply(wrapper, [this, _clearAllExpires, "clearAllExpires"].concat(Array.prototype.slice.call(arguments)));
+    },
+    isSupported: function isSupported() {
+        return _isStorageSupported(window[this.opts.Storage]);
     }
 };
 
