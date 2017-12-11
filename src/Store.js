@@ -102,7 +102,6 @@ function initLegalStruct() {
 }
 
 function wrapper(fn, action) {
-    debugger;
     console.log(this);
     var args = [].slice.call(arguments, 2),
         result,

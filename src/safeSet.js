@@ -21,7 +21,7 @@
  *      * 能取值
  *              * obj[k]是否存在 
  *                    * 存在       
- *                          *  obj[k]不是引用对象   (代码C)
+ *                          *  obj[k]不是引用对象   
  *                                * 是否是最后一个key
  *                                      * 是,obj[k]=result
  *                                      * 不是
@@ -56,7 +56,9 @@ function safeSet(data, path, result, newArrayIfNeed) {
         ArrayObj.push(ob);
         val = ob[key];
         if (val && typeof val == "object") {
-          ob[key] = val;          
+          if(i == len -1){
+            ob[key]= result;
+          }       
         } else {
           if (i == len - 1) {
             ob[key] = result;
