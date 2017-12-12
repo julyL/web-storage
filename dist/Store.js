@@ -239,9 +239,34 @@ function safeSet(data, path, result, newArrayIfNeed) {
     return safeSet(data, pathKeyArr, result, newArrayIfNeed);
   }
 }
+/*
+
+//例1:
+var data = {b:1}; 
+safeSet(data,'b',2);  //=> {b:2}
+
+//例2:
+var data = {b:1}; 
+// safeSet(data,'b.1',2);  //=> {b:{1:2}}
+// safeSet(data,'b.1',2,true);  //=> {b:[,2]}
+
+//例3:
+var data = 1; 
+//safeSet(data,'b',2);  //=> {b:2}
+//safeSet(data,'1',2);  //=> {1:2}
+//safeSet(data,'1',2,true);  //=> [,2]
+
+//例4:
+var data = 1; 
+//safeSet(data,'b.c',2);   //=> {b:{c:2}}
+//safeSet(data,'b.1',2);   //=> {b:{1:2}}
+//safeSet(data,'b.1',2,true);   //=> {b:[,2]}
+
+*/
 
 var noop = function noop() {};
 var defaultOptions = {
+    namespace: "",
     debug: false,
     Storage: "localStorage",
     exp: 31536000000, // 默认超时100年
@@ -373,6 +398,7 @@ function wrapper(fn, action) {
 function _set(key, val, opts) {
     var opts = _extend(this.opts, opts),
         allStorage = this.getAllStorage(),
+        key = opts.namespace ? opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = this.opts.deserialize(allStorage[firstKey]),
         nowTimeStamp = +new Date(),
@@ -389,6 +415,7 @@ function _set(key, val, opts) {
 
 function _get(key) {
     var allStorage = this.getAllStorage(),
+        key = this.opts.namespace ? this.opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = this.opts.deserialize(allStorage[firstKey]);
     if (isLegalStruct(parsedData)) {
@@ -402,7 +429,11 @@ function _get(key) {
 }
 
 function _remove(key) {
-    this.removeItem.call(window[this.opts.Storage], key);
+    if (this.opts.namespace) {
+        _set.call(this, key, "");
+    } else {
+        this.removeItem.call(window[this.opts.Storage], key);
+    }
 }
 
 function _clearAllExpires() {

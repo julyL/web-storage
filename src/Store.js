@@ -2,6 +2,7 @@ import safeGet from './safeGet';
 import safeSet from './safeSet';
 var noop = function () {},
     defaultOptions = {
+        namespace: "",
         debug: false,
         Storage: "localStorage",
         exp: 31536000000, // 默认超时100年
@@ -124,7 +125,7 @@ function wrapper(fn, action) {
                 }
             }
         }
-        console.log(action + "(" + (args[0] ? '"' + args[0] + '"' : "") + (args[1] ? ", " + this.opts.serialize(args[1]) : "") + (args[2] ? ", " + JSON.stringify(args[2]) : "") + ")", "\n   =>  " , storage);
+        console.log(action + "(" + (args[0] ? '"' + args[0] + '"' : "") + (args[1] ? ", " + this.opts.serialize(args[1]) : "") + (args[2] ? ", " + JSON.stringify(args[2]) : "") + ")", "\n   =>  ", storage);
     }
     return result;
 }
@@ -132,6 +133,7 @@ function wrapper(fn, action) {
 function _set(key, val, opts) {
     var opts = _extend(this.opts, opts),
         allStorage = this.getAllStorage(),
+        key = opts.namespace ? opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = this.opts.deserialize(allStorage[firstKey]),
         nowTimeStamp = +new Date(),
@@ -152,6 +154,7 @@ function _set(key, val, opts) {
 
 function _get(key) {
     var allStorage = this.getAllStorage(),
+        key = this.opts.namespace ? this.opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = this.opts.deserialize(allStorage[firstKey]);
     if (isLegalStruct(parsedData)) {
@@ -165,7 +168,11 @@ function _get(key) {
 }
 
 function _remove(key) {
-    this.removeItem.call(window[this.opts.Storage], key);
+    if (this.opts.namespace) {
+        _set.call(this,key,"");
+    } else {
+        this.removeItem.call(window[this.opts.Storage], key);
+    }
 }
 
 function _clearAllExpires() {

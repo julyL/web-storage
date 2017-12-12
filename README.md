@@ -28,6 +28,7 @@ options [Object 配置信息]
 |-----|-----|-----|-----|
 |Storage|String|"localStorage"|可选（"sessionStorage"）|
 |exp|Number|31536000000(100年)|过期时间|
+|namespace|String|无|命名空间|
 |serialize|Function|默认执行JSON.stringify|存储到Storage时会执行serialize,可用于加密数据|
 |deserialize|Function|默认执行JSON.parse|从Storage取出来会执行deserialize,可用于解密数据|
 |parseToArray|Bollean|true|path存在[]时,解析为数组(true)还是对象(false) (见例3)|
