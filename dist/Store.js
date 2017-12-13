@@ -239,30 +239,6 @@ function safeSet(data, path, result, newArrayIfNeed) {
     return safeSet(data, pathKeyArr, result, newArrayIfNeed);
   }
 }
-/*
-
-//例1:
-var data = {b:1}; 
-safeSet(data,'b',2);  //=> {b:2}
-
-//例2:
-var data = {b:1}; 
-// safeSet(data,'b.1',2);  //=> {b:{1:2}}
-// safeSet(data,'b.1',2,true);  //=> {b:[,2]}
-
-//例3:
-var data = 1; 
-//safeSet(data,'b',2);  //=> {b:2}
-//safeSet(data,'1',2);  //=> {1:2}
-//safeSet(data,'1',2,true);  //=> [,2]
-
-//例4:
-var data = 1; 
-//safeSet(data,'b.c',2);   //=> {b:{c:2}}
-//safeSet(data,'b.1',2);   //=> {b:{1:2}}
-//safeSet(data,'b.1',2,true);   //=> {b:[,2]}
-
-*/
 
 var noop = function noop() {};
 var defaultOptions = {
@@ -301,7 +277,7 @@ var defaultOptions = {
         var polyFn = that.opts.polyfill[funcName];
         if (polyFn === noop) {
             if (funcName == "getAllStorage") {
-                return function () {
+                return function (opts) {
                     return window[that.opts.Storage];
                 };
             } else {
@@ -395,21 +371,25 @@ function wrapper(fn, action) {
     return result;
 }
 
-function _set(key, val, opts) {
-    var opts = _extend(this.opts, opts),
-        allStorage = this.getAllStorage(),
+function _set(key, val, options) {
+    var opts = this.opts;
+    if (options && options.exp) {
+        // 仅支持设置exp
+        opts.exp = options.exp;
+    }
+    var allStorage = this.getAllStorage(),
         key = opts.namespace ? opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
-        parsedData = this.opts.deserialize(allStorage[firstKey]),
+        parsedData = opts.deserialize(allStorage[firstKey]),
         nowTimeStamp = +new Date(),
         expiresTime = nowTimeStamp + opts.exp * 100;
     if (!isLegalStruct(parsedData)) {
         parsedData = initLegalStruct();
     }
-    this.setItem.call(window[this.opts.Storage], firstKey, opts.serialize({
+    this.setItem.call(window[opts.Storage], firstKey, opts.serialize({
         __start__: nowTimeStamp,
         __end__: expiresTime,
-        __data__: safeSet(parsedData.__data__, key, val, this.opts.parseToArray)
+        __data__: safeSet(parsedData.__data__, key, val, opts.parseToArray)
     }));
 }
 

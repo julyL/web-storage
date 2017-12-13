@@ -10,8 +10,8 @@ var store = new Store(options)
 //根据path取值
 store.get(path)
 
-//根据path设置val
-store.set(path,val,options)
+//根据path设置val,opts仅支持设置过期时间exp
+store.set(path,val,opts)   
 
 //删除键值
 store.remove(key)
@@ -22,6 +22,7 @@ store.clearAllExpires()
 key  [String] (不包含.[]字符)
 path [String]  可以理解为一个路径 例如"a.b.c[1].d.[2]" ,也可以是key
 options [Object 配置信息]
+opts 仅支持设置过期时间exp 
 ```
 #### options的字段说明
 |字段|类型|默认值|说明|
