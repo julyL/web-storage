@@ -1,12 +1,18 @@
 import safeGet from './safeGet';
 import safeSet from './safeSet';
-var noop = function () {},
-    defaultOptions = {
+var noop = function () {};
+/**
+ * Store构造函数
+ * @param {Object} opts 
+ */
+var Store = function (opts) {
+    var that = this;
+    var defaultOptions = {
         namespace: "",
         debug: false,
         Storage: "localStorage",
-        exp: 31536000000, // 默认超时100年
-        serialize(data) {
+        exp: 31536000000,
+        serialize(data) { // 默认超时100年
             return JSON.stringify(data);
         },
         deserialize(data) {
@@ -18,13 +24,7 @@ var noop = function () {},
             removeItem: noop,
             getAllStorage: noop
         }
-    }
-/**
- * Store构造函数
- * @param {Object} opts 
- */
-var Store = function (opts) {
-    var that = this;
+    };
     if (!(this instanceof Store)) {
         throw new TypeError("Failed to construct 'Store': Please use the 'new' operator, this object construc" +
             "tor cannot be called as a function.");

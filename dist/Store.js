@@ -241,30 +241,32 @@ function safeSet(data, path, result, newArrayIfNeed) {
 }
 
 var noop = function noop() {};
-var defaultOptions = {
-    namespace: "",
-    debug: false,
-    Storage: "localStorage",
-    exp: 31536000000, // 默认超时100年
-    serialize: function serialize(data) {
-        return JSON.stringify(data);
-    },
-    deserialize: function deserialize(data) {
-        return data && JSON.parse(data);
-    },
-
-    parseToArray: true,
-    polyfill: { // 不支持localStorage时,可以通过实现以下函数来进行polyfill
-        setItem: noop,
-        removeItem: noop,
-        getAllStorage: noop
-    }
-    /**
-     * Store构造函数
-     * @param {Object} opts 
-     */
-};var Store = function Store(opts) {
+/**
+ * Store构造函数
+ * @param {Object} opts 
+ */
+var Store = function Store(opts) {
     var that = this;
+    var defaultOptions = {
+        namespace: "",
+        debug: false,
+        Storage: "localStorage",
+        exp: 31536000000,
+        serialize: function serialize(data) {
+            // 默认超时100年
+            return JSON.stringify(data);
+        },
+        deserialize: function deserialize(data) {
+            return data && JSON.parse(data);
+        },
+
+        parseToArray: true,
+        polyfill: { // 不支持localStorage时,可以通过实现以下函数来进行polyfill
+            setItem: noop,
+            removeItem: noop,
+            getAllStorage: noop
+        }
+    };
     if (!(this instanceof Store)) {
         throw new TypeError("Failed to construct 'Store': Please use the 'new' operator, this object construc" + "tor cannot be called as a function.");
     }

@@ -1,6 +1,6 @@
 {
   "name": "l-store",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A js libray for web storage, default support for localStorage and sessionStorage.",
   "main": "index.js",
   "repository": {
