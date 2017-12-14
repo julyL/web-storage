@@ -1,6 +1,6 @@
 {
   "name": "l-store",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "A js libray for web storage, default support for localStorage and sessionStorage.",
   "main": "index.js",
   "repository": {
@@ -8,7 +8,6 @@
     "url": "git@github.com:julyL/web-storage.git"
   },
   "scripts": {
-    "test": "mocha  --compilers js:babel-register test/*.test.js",
     "build": "rollup -c",
     "publish": "rollup -c&&cross-env NODE_ENV=production rollup -c",
     "dev": "rollup -c --watch"
@@ -31,7 +30,7 @@
     "babel-register": "^6.26.0",
     "chai": "^4.1.2",
     "cross-env": "^5.1.1",
-    "mocha": "^3.5.0",
+    "mocha": "^3.5.3",
     "rollup": "^0.49.2",
     "rollup-plugin-babel": "^2.7.1",
     "rollup-plugin-commonjs": "^8.2.6",

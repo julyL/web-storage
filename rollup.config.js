@@ -6,12 +6,12 @@ import uglify from 'rollup-plugin-uglify';
 var prod = process.env.NODE_ENV=='production',
   distPath;
 if (prod) {
-  distPath = "./dist/Store.min.js";
+  distPath = "./dist/lStore.min.js";
 } else {
-  distPath = "./dist/Store.js";
+  distPath = "./dist/lStore.js";
 }
 export default {
-  entry : "./src/Store.js",
+  entry : "./src/lStore.js",
   dest : distPath,
   plugins : [
     resolve({jsnext: true, main: true, browser: true}),
@@ -20,5 +20,5 @@ export default {
     prod&&uglify()
   ],
   format : "umd",
-  moduleName : "Store"
+  moduleName : "lStore"
 };
