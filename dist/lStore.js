@@ -1,7 +1,7 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
 	typeof define === 'function' && define.amd ? define(factory) :
-	(global.Store = factory());
+	(global.lStore = factory());
 }(this, (function () { 'use strict';
 
 /**
@@ -239,18 +239,36 @@ function safeSet(data, path, result, newArrayIfNeed) {
     return safeSet(data, pathKeyArr, result, newArrayIfNeed);
   }
 }
+/*
 
-var noop = function noop() {};
-/**
- * Store构造函数
- * @param {Object} opts 
- */
+//例1:
+var data = {b:1}; 
+safeSet(data,'b',2);  //=> {b:2}
+
+//例2:
+var data = {b:1}; 
+// safeSet(data,'b.1',2);  //=> {b:{1:2}}
+// safeSet(data,'b.1',2,true);  //=> {b:[,2]}
+
+//例3:
+var data = 1; 
+//safeSet(data,'b',2);  //=> {b:2}
+//safeSet(data,'1',2);  //=> {1:2}
+//safeSet(data,'1',2,true);  //=> [,2]
+
+//例4:
+var data = 1; 
+//safeSet(data,'b.c',2);   //=> {b:{c:2}}
+//safeSet(data,'b.1',2);   //=> {b:{1:2}}
+//safeSet(data,'b.1',2,true);   //=> {b:[,2]}
+
+*/
+
 var Store = function Store(opts) {
-    var that = this;
     var defaultOptions = {
         namespace: "",
         debug: false,
-        Storage: "localStorage",
+        storage: "localStorage",
         exp: 31536000000,
         serialize: function serialize(data) {
             // 默认超时100年
@@ -260,43 +278,13 @@ var Store = function Store(opts) {
             return data && JSON.parse(data);
         },
 
-        parseToArray: true,
-        polyfill: { // 不支持localStorage时,可以通过实现以下函数来进行polyfill
-            setItem: noop,
-            removeItem: noop,
-            getAllStorage: noop
-        }
+        parseToArray: true
     };
     if (!(this instanceof Store)) {
-        throw new TypeError("Failed to construct 'Store': Please use the 'new' operator, this object construc" + "tor cannot be called as a function.");
+        throw new TypeError("Store should be used as Failed to construct 'lStore': Please use the 'new' operator, this object construc" + "tor cannot be called as a function.");
     }
     this.opts = _extend(defaultOptions, opts);
-    this.setItem = _setFunction("setItem");
-    this.removeItem = _setFunction("removeItem");
-    this.getAllStorage = _setFunction("getAllStorage");
-
-    function _setFunction(funcName) {
-        var polyFn = that.opts.polyfill[funcName];
-        if (polyFn === noop) {
-            if (funcName == "getAllStorage") {
-                return function (opts) {
-                    return window[that.opts.Storage];
-                };
-            } else {
-                return window[that.opts.Storage][funcName];
-            }
-        } else if (isFunction(polyFn)) {
-            //如果要在不支持localStorage的环境中使用,可自行实现opts.polyfill[funcName]
-            return polyFn;
-        } else {
-            throw new TypeError('Polyfill ' + funcName + ' should be a function');
-        }
-    }
 };
-
-function isFunction() {
-    return typeof fn === 'function';
-}
 
 function _extend(obj, props) {
     for (var key in props) {
@@ -352,7 +340,7 @@ function wrapper(fn, action) {
         key;
     result = fn.apply(this, args);
     if (this.opts.debug) {
-        storage = _extend({}, this.getAllStorage());
+        storage = _extend({}, window[this.opts.storage]);
         for (var i in storage) {
             if (storage.hasOwnProperty(i)) {
                 key = this.opts.deserialize(storage[i]);
@@ -378,7 +366,7 @@ function _set(key, val, options) {
         // 仅支持设置exp
         opts.exp = options.exp;
     }
-    var allStorage = this.getAllStorage(),
+    var allStorage = window[opts.storage],
         key = opts.namespace ? "__namespace__" + opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = opts.deserialize(allStorage[firstKey]),
@@ -387,7 +375,7 @@ function _set(key, val, options) {
     if (!isLegalStruct(parsedData)) {
         parsedData = initLegalStruct();
     }
-    this.setItem.call(window[opts.Storage], firstKey, opts.serialize({
+    window[opts.storage].setItem(firstKey, opts.serialize({
         __start__: nowTimeStamp,
         __end__: expiresTime,
         __data__: safeSet(parsedData.__data__, key, val, opts.parseToArray)
@@ -395,7 +383,7 @@ function _set(key, val, options) {
 }
 
 function _get(key) {
-    var allStorage = this.getAllStorage(),
+    var allStorage = window[this.opts.storage],
         originKey = key,
         key = this.opts.namespace ? "__namespace__" + this.opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
@@ -414,12 +402,12 @@ function _remove(key) {
     if (this.opts.namespace) {
         _set.call(this, key, "");
     } else {
-        this.removeItem.call(window[this.opts.Storage], key);
+        window[this.opts.storage].removeItem(key);
     }
 }
 
 function _clearAllExpires() {
-    var allStorage = this.getAllStorage(),
+    var allStorage = window[this.opts.storage],
         nowTimeStamp = +new Date(),
         parsedData;
     for (var key in allStorage) {
@@ -427,7 +415,7 @@ function _clearAllExpires() {
             parsedData = this.opts.deserialize(allStorage[key]);
             if (isLegalStruct(parsedData)) {
                 if (nowTimeStamp >= parsedData.__end__) {
-                    this.removeItem.call(window[this.opts.Storage], key);
+                    this.removeItem.call(window[this.opts.storage], key);
                 }
             }
         }
@@ -449,7 +437,7 @@ Store.prototype = {
         return wrapper.call.apply(wrapper, [this, _clearAllExpires, "clearAllExpires"].concat(Array.prototype.slice.call(arguments)));
     },
     isSupported: function isSupported() {
-        return _isStorageSupported(window[this.opts.Storage]);
+        return _isStorageSupported(window[this.opts.storage]);
     }
 };
 

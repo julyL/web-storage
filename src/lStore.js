@@ -10,7 +10,7 @@ var Store = function (opts) {
     var defaultOptions = {
         namespace: "",
         debug: false,
-        Storage: "localStorage",
+        storage: "localStorage",
         exp: 31536000000,
         serialize(data) { // 默认超时100年
             return JSON.stringify(data);
@@ -18,37 +18,13 @@ var Store = function (opts) {
         deserialize(data) {
             return data && JSON.parse(data);
         },
-        parseToArray: true,
-        polyfill: { // 不支持localStorage时,可以通过实现以下函数来进行polyfill
-            setItem: noop,
-            removeItem: noop,
-            getAllStorage: noop
-        }
+        parseToArray: true
     };
     if (!(this instanceof Store)) {
-        throw new TypeError("Failed to construct 'Store': Please use the 'new' operator, this object construc" +
+        throw new TypeError("Store should be used as Failed to construct 'lStore': Please use the 'new' operator, this object construc" +
             "tor cannot be called as a function.");
     }
     this.opts = _extend(defaultOptions, opts);
-    this.setItem = _setFunction("setItem");
-    this.removeItem = _setFunction("removeItem");
-    this.getAllStorage = _setFunction("getAllStorage");
-
-    function _setFunction(funcName) {
-        var polyFn = that.opts.polyfill[funcName];
-        if (polyFn === noop) {
-            if (funcName == "getAllStorage") {
-                return (opts) => window[that.opts.Storage];
-            } else {
-                return window[that.opts.Storage][funcName];
-            }
-        } else if (isFunction(polyFn)) {
-            //如果要在不支持localStorage的环境中使用,可自行实现opts.polyfill[funcName]
-            return polyFn;
-        } else {
-            throw new TypeError(`Polyfill ${funcName} should be a function`);
-        }
-    }
 }
 
 function isFunction() {
@@ -109,7 +85,7 @@ function wrapper(fn, action) {
         key;
     result = fn.apply(this, args);
     if (this.opts.debug) {
-        storage = _extend({}, this.getAllStorage());
+        storage = _extend({}, window[this.opts.storage]);
         for (var i in storage) {
             if (storage.hasOwnProperty(i)) {
                 key = this.opts.deserialize(storage[i]);
@@ -134,7 +110,7 @@ function _set(key, val, options) {
     if (options && options.exp) { // 仅支持设置exp
         opts.exp = options.exp;
     }
-    var allStorage = this.getAllStorage(),
+    var allStorage = window[opts.storage],
         key = opts.namespace ? "__namespace__" + opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = opts.deserialize(allStorage[firstKey]),
@@ -143,8 +119,7 @@ function _set(key, val, options) {
     if (!isLegalStruct(parsedData)) {
         parsedData = initLegalStruct();
     }
-    this.setItem.call(
-        window[opts.Storage],
+    window[opts.storage].setItem(
         firstKey,
         opts.serialize({
             __start__: nowTimeStamp,
@@ -155,7 +130,7 @@ function _set(key, val, options) {
 }
 
 function _get(key) {
-    var allStorage = this.getAllStorage(),
+    var allStorage = window[this.opts.storage],
         originKey = key,
         key = this.opts.namespace ? "__namespace__" + this.opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
@@ -174,12 +149,12 @@ function _remove(key) {
     if (this.opts.namespace) {
         _set.call(this, key, "");
     } else {
-        this.removeItem.call(window[this.opts.Storage], key);
+        window[this.opts.storage].removeItem(key);
     }
 }
 
 function _clearAllExpires() {
-    var allStorage = this.getAllStorage(),
+    var allStorage = window[this.opts.storage],
         nowTimeStamp = +new Date(),
         parsedData;
     for (var key in allStorage) {
@@ -187,7 +162,7 @@ function _clearAllExpires() {
             parsedData = this.opts.deserialize(allStorage[key]);
             if (isLegalStruct(parsedData)) {
                 if (nowTimeStamp >= parsedData.__end__) {
-                    this.removeItem.call(window[this.opts.Storage], key);
+                    this.removeItem.call(window[this.opts.storage], key);
                 }
             }
         }
@@ -209,7 +184,7 @@ Store.prototype = {
         return wrapper.call(this, _clearAllExpires, "clearAllExpires", ...arguments);
     },
     isSupported() {
-        return _isStorageSupported(window[this.opts.Storage])
+        return _isStorageSupported(window[this.opts.storage])
     }
 }
 export default Store;
