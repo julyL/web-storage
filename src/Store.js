@@ -103,7 +103,6 @@ function initLegalStruct() {
 }
 
 function wrapper(fn, action) {
-    console.log(this);
     var args = [].slice.call(arguments, 2),
         result,
         storage,
@@ -136,7 +135,7 @@ function _set(key, val, options) {
         opts.exp = options.exp;
     }
     var allStorage = this.getAllStorage(),
-        key = opts.namespace ? opts.namespace + "." + key : key,
+        key = opts.namespace ? "__namespace__" + opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = opts.deserialize(allStorage[firstKey]),
         nowTimeStamp = +new Date(),
@@ -157,13 +156,14 @@ function _set(key, val, options) {
 
 function _get(key) {
     var allStorage = this.getAllStorage(),
-        key = this.opts.namespace ? this.opts.namespace + "." + key : key,
+        originKey = key,
+        key = this.opts.namespace ? "__namespace__" + this.opts.namespace + "." + key : key,
         firstKey = key.split(".")[0],
         parsedData = this.opts.deserialize(allStorage[firstKey]);
     if (isLegalStruct(parsedData)) {
         if (+new Date() >= parsedData.__end__) {
             // 取值时如果已过期,则会删除
-            this.remove(firstKey);
+            this.remove(this.opts.namespace ? originKey : firstKey);
         } else {
             return safeGet(parsedData.__data__, key);
         }
