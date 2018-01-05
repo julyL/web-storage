@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <script src="../dist/lStore.js" type="text/javascript"></script>
+</head>
+
+<body>
+    <script>
+        localStorage.clear();
+        var lstore = new lStore({
+          
+        });
+
+        console.log('auto general Object if path include . ');
+        lstore.set("a.b", {
+            c: 1
+        });
+
+        console.log('\n\nauto general Array by defalut if path include Number or [] \n');
+        lstore.set("d[1].1.[1]", {
+            e: 0
+        });
+
+        console.log('\n\nset opts parseToArray to false');
+        var lstore2 = new lStore({
+            debug:true,
+            parseToArray:false
+        });
+        lstore2.set("e.1", 2);
+
+        console.log('\n\n fffff will expired after 1s');
+        lstore.set("fffff", 1, {
+            exp: 1
+        });
+        
+        console.log('\n\n');
+        lstore = new lStore({
+            debug:true
+        });
+        lstore.set("data1", 1111, {     
+            exp: 2
+        });
+        lstore.set("data2", 2222, {
+            exp: 5
+        });
+
+        setTimeout(function () {
+            lstore.get("fffff");
+            console.log('after execute get , fffff is deleted',localStorage,'\n\n\n');
+            console.log("3s later,excute clearAllExpires,delete data1");
+            lstore.clearAllExpires();
+        }, 3000);
+    </script>
+</body>
+
+</html>
