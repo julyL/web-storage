@@ -47,4 +47,13 @@ describe("set/get value  by path like `a.b.c`", function () {
       },3000)
     });
 
+    it("remove data after 5s", function() {
+        setTimeout(function() {
+            lstore.remove("a");
+            lstore.remove("d");
+            expect(lstore.get("a")).to.be.equal(undefined);
+            expect(lstore.get("d")).to.be.equal(undefined);
+            console.log("after remove:", localStorage);
+        }, 5000);
+    });
 });

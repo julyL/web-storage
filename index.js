@@ -88,10 +88,9 @@ function formatDate(date) {
 
 function _set(key, val, options) {
     var opts = _extend(this.opts, {
-        exp: (options && options.exp)||this.opts.exp
-    });
-    // debugger;
-    var allStorage = window[opts.storage],
+            exp: (options && options.exp) || this.opts.exp
+        }),
+        allStorage = window[opts.storage],
         storageKey = key.split(".")[0].split("[")[0],
         parsedData = opts.deserialize(allStorage[storageKey]),
         nowTimeStamp = +new Date(),
